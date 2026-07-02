@@ -3,10 +3,22 @@
 // real LLM call (via z-ai-web-dev-sdk) with a specialized system prompt.
 // Agents run with parallel fan-out where possible, write to a shared typed
 // state channel, and emit events for the streaming UI.
+//
+// If the z-ai SDK is not configured (no .z-ai-config file found), agents
+// automatically fall back to demo mode with realistic pre-written responses
+// so the full pipeline flow and UI still works for anyone who clones the repo.
 
 import ZAI from "z-ai-web-dev-sdk";
 import type { Claim } from "./claims";
 import { retrievePolicyClauses, type RetrievedClause } from "./policy";
+import {
+  isZaiConfigured,
+  demoRouting, demoExtraction, demoRetrieval, demoVision,
+  demoFraud, demoCoverage, demoAdjudication, demoAudit,
+} from "./demo-responses";
+
+// Check once at module load whether the z-ai SDK is configured
+const ZAI_CONFIGURED = isZaiConfigured();
 
 // ===== Shared state channel (the "graph state") =====
 export interface AgentState {
@@ -120,6 +132,7 @@ function extractJSON(text: string): any {
 // ===== Individual Agents =====
 
 async function routerAgent(claim: Claim): Promise<AgentState["routing"]> {
+  if (!ZAI_CONFIGURED) return demoRouting(claim);
   const system = `You are the Intake Router agent for an insurance claims system. Classify the claim by line of business, assess severity, and route it. Respond ONLY with valid JSON.`;
   const user = `Claim ID: ${claim.id}
 Line of Business: ${claim.lob}
@@ -141,16 +154,12 @@ Respond with JSON: {"lob": string, "severity": "low"|"moderate"|"severe", "path"
   try {
     return extractJSON(raw);
   } catch {
-    return {
-      lob: claim.lob,
-      severity: claim.amount > 15000 ? "severe" : claim.amount > 5000 ? "moderate" : "low",
-      path: claim.amount > 15000 ? "deep_review" : "fast_track",
-      rationale: "Rule-based fallback classification.",
-    };
+    return demoRouting(claim);
   }
 }
 
 async function extractorAgent(claim: Claim): Promise<AgentState["extraction"]> {
+  if (!ZAI_CONFIGURED) return demoExtraction(claim);
   const system = `You are a Document Extraction agent specializing in insurance claim forms and repair estimates. Extract structured fields precisely from the provided documents. Respond ONLY with valid JSON.`;
   const docText = claim.documents.map((d) => `--- ${d.title} ---\n${d.content}`).join("\n\n");
   const user = `Extract the following fields from these claim documents for claim ${claim.id}:
@@ -164,7 +173,7 @@ Respond with JSON: {"fields": {"field": "value", ...}, "notes": "any anomalies o
   try {
     return extractJSON(raw);
   } catch {
-    return { fields: { claimantName: claim.claimant, claimedAmount: String(claim.amount) }, notes: "Extraction parse error — fallback used." };
+    return demoExtraction(claim);
   }
 }
 
@@ -186,6 +195,7 @@ async function retrieverAgent(claim: Claim): Promise<AgentState["policyRetrieval
 }
 
 async function visionAgent(claim: Claim): Promise<AgentState["damageAssessment"]> {
+  if (!ZAI_CONFIGURED) return demoVision(claim);
   const system = `You are a Vision/Damage Assessment agent for insurance claims. You analyze photo evidence descriptions and assess damage severity, affected components, and consistency with the reported narrative. Respond ONLY with valid JSON.`;
   const photoDescs = claim.photos.map((p) => `Photo ${p.id}: ${p.description}`).join("\n\n");
   const user = `Claim narrative: ${claim.narrative}
@@ -206,17 +216,12 @@ Respond with JSON: {"components": [string], "severity": string, "estimatedDamage
   try {
     return extractJSON(raw);
   } catch {
-    return {
-      components: ["Unable to parse"],
-      severity: "unknown",
-      estimatedDamageAreaPct: 0,
-      consistencyWithNarrative: true,
-      notes: "Vision parse error.",
-    };
+    return demoVision(claim);
   }
 }
 
 async function fraudAgent(claim: Claim, extraction: AgentState["extraction"], vision: AgentState["damageAssessment"]): Promise<AgentState["fraudAssessment"]> {
+  if (!ZAI_CONFIGURED) return demoFraud(claim, extraction, vision);
   const system = `You are a Fraud Detection agent. You analyze claims for fraud indicators using textual and behavioral signals. Be calibrated — most claims are legitimate. Only flag genuine red flags. Respond ONLY with valid JSON.`;
   const user = `Claim ${claim.id} — ${claim.lob}, $${claim.amount.toLocaleString()}
 Narrative: ${claim.narrative}
@@ -239,7 +244,7 @@ Respond with JSON: {"score": number, "signals": [string], "recommendation": "cle
   try {
     return extractJSON(raw);
   } catch {
-    return { score: 20, signals: ["Unable to parse fraud analysis"], recommendation: "monitor" };
+    return demoFraud(claim, extraction, vision);
   }
 }
 
@@ -247,6 +252,7 @@ async function coverageAgent(
   claim: Claim,
   retrieval: AgentState["policyRetrieval"]
 ): Promise<AgentState["coverageAnalysis"]> {
+  if (!ZAI_CONFIGURED) return demoCoverage(claim, retrieval);
   const system = `You are a Coverage Verification agent. You determine whether a claim is covered under the insured's policy by analyzing retrieved policy clauses against the claim facts. Be precise about deductibles and exclusions. Respond ONLY with valid JSON.`;
   const clausesText = retrieval?.clauses
     .map((c) => `[${c.id}] ${c.title} (${c.section}): ${c.snippet}`)
@@ -271,13 +277,7 @@ Respond with JSON: {"covered": boolean, "applicableClauses": [{"id": string, "ti
   try {
     return extractJSON(raw);
   } catch {
-    return {
-      covered: true,
-      applicableClauses: [],
-      deductible: "unknown",
-      exclusions: [],
-      reasoning: "Coverage parse error — defaulting to covered pending review.",
-    };
+    return demoCoverage(claim, retrieval);
   }
 }
 
@@ -285,6 +285,7 @@ async function adjudicatorAgent(
   claim: Claim,
   state: AgentState
 ): Promise<AgentState["adjudication"]> {
+  if (!ZAI_CONFIGURED) return demoAdjudication(claim, state);
   const system = `You are the Adjudicator agent. You synthesize all agent findings into a final settlement recommendation. Every claim you make MUST cite the specific policy clause ID that supports it. Be decisive but accurate. Respond ONLY with valid JSON.`;
   const user = `CLAIM ${claim.id} — ${claim.claimant} — ${claim.lob} — $${claim.amount.toLocaleString()}
 
@@ -323,17 +324,12 @@ Respond with JSON:
   try {
     return extractJSON(raw);
   } catch {
-    return {
-      decision: "review",
-      recommendedPayout: 0,
-      summary: "Adjudication parse error — escalating to human review.",
-      rationale: raw.slice(0, 300),
-      citations: [],
-    };
+    return demoAdjudication(claim, state);
   }
 }
 
 async function auditorAgent(claim: Claim, state: AgentState): Promise<AgentState["audit"]> {
+  if (!ZAI_CONFIGURED) return demoAudit(claim, state);
   const system = `You are the Auditor agent — a quality gate that validates the Adjudicator's recommendation for groundedness, coverage logic, and policy compliance before it reaches a human. Respond ONLY with valid JSON.`;
   const user = `Validate this adjudication for claim ${claim.id}:
 
@@ -361,13 +357,7 @@ Respond with JSON:
   try {
     return extractJSON(raw);
   } catch {
-    return {
-      groundednessScore: 50,
-      coverageLogicScore: 50,
-      complianceScore: 50,
-      issues: ["Auditor parse error — manual review required"],
-      verdict: "escalate",
-    };
+    return demoAudit(claim, state);
   }
 }
 
@@ -379,9 +369,12 @@ Respond with JSON:
 export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
   const state: AgentState = { claim };
 
+  // In demo mode, add small delays so the UI shows agents streaming
+  const demoDelay = ZAI_CONFIGURED ? 0 : 800;
+
   // 1. Supervisor + Router
   yield { type: "agent_start", agentId: "supervisor", agentName: "Supervisor", timestamp: Date.now() };
-  await sleep(150);
+  await sleep(150 + demoDelay);
   yield { type: "agent_start", agentId: "router", agentName: "Intake Router", timestamp: Date.now() };
   const t0 = Date.now();
   try {
@@ -406,9 +399,9 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
 
   const [extT0, retT0, visT0] = [Date.now(), Date.now(), Date.now()];
   const [extP, retP, visP] = [
-    extractorAgent(claim).then((r) => ({ r, t: Date.now() - extT0 })),
-    retrieverAgent(claim).then((r) => ({ r, t: Date.now() - retT0 })),
-    visionAgent(claim).then((r) => ({ r, t: Date.now() - visT0 })),
+    extractorAgent(claim).then(async (r) => { if (demoDelay) await sleep(demoDelay); return { r, t: Date.now() - extT0 }; }),
+    retrieverAgent(claim).then(async (r) => { if (demoDelay) await sleep(demoDelay / 2); return { r, t: Date.now() - retT0 }; }),
+    visionAgent(claim).then(async (r) => { if (demoDelay) await sleep(demoDelay); return { r, t: Date.now() - visT0 }; }),
   ];
 
   // Emit completes as they resolve (preserving the parallel feel)
@@ -464,8 +457,8 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
   yield { type: "agent_start", agentId: "coverage", agentName: "Coverage Verifier", timestamp: Date.now() };
   const [fraudT0, covT0] = [Date.now(), Date.now()];
   const [fraudP, covP] = [
-    fraudAgent(claim, state.extraction, state.damageAssessment).then((r) => ({ r, t: Date.now() - fraudT0 })),
-    coverageAgent(claim, state.policyRetrieval).then((r) => ({ r, t: Date.now() - covT0 })),
+    fraudAgent(claim, state.extraction, state.damageAssessment).then(async (r) => { if (demoDelay) await sleep(demoDelay); return { r, t: Date.now() - fraudT0 }; }),
+    coverageAgent(claim, state.policyRetrieval).then(async (r) => { if (demoDelay) await sleep(demoDelay); return { r, t: Date.now() - covT0 }; }),
   ];
   const [fraudRes, covRes] = await Promise.allSettled([fraudP, covP]);
 
@@ -501,6 +494,7 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
 
   // 4. Adjudicator
   yield { type: "agent_start", agentId: "adjudicator", agentName: "Adjudicator", timestamp: Date.now() };
+  if (demoDelay) await sleep(demoDelay);
   const adjT0 = Date.now();
   try {
     state.adjudication = await adjudicatorAgent(claim, state);
@@ -519,6 +513,7 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
 
   // 5. Auditor (final gate)
   yield { type: "agent_start", agentId: "auditor", agentName: "Auditor (QA Gate)", timestamp: Date.now() };
+  if (demoDelay) await sleep(demoDelay);
   const audT0 = Date.now();
   try {
     state.audit = await auditorAgent(claim, state);
