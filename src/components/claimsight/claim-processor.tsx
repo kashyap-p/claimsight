@@ -164,11 +164,21 @@ export function ClaimProcessor({ claimId }: Props) {
   if (!claimId || !claim) {
     return (
       <section id="processor" className="mx-auto max-w-6xl px-4 sm:px-6 py-12">
-        <Card className="border-dashed">
-          <CardContent className="p-12 text-center text-muted-foreground">
-            <Gavel className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">Select a claim from the queue above</p>
-            <p className="text-sm mt-1">to run the 12-agent adjudication pipeline</p>
+        <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+          <CardContent className="p-8 sm:p-12 text-center">
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mx-auto mb-4">
+              <Gavel className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No claim selected yet</h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+              Click a claim card above (look for the <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-bold align-middle">START HERE</span> badge) to load it here, then hit <span className="font-semibold text-foreground">Run Pipeline</span> to watch the 9 agents work.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Waiting for claim selection
+              </span>
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -190,8 +200,8 @@ export function ClaimProcessor({ claimId }: Props) {
               <RotateCcw className="w-4 h-4 mr-1" /> Reset
             </Button>
           ) : (
-            <Button size="sm" onClick={handleRun}>
-              <Play className="w-4 h-4 mr-1" /> Run Pipeline
+            <Button size="lg" onClick={handleRun} className="agent-pulse text-base px-6">
+              <Play className="w-4 h-4 mr-2 fill-current" /> Run Pipeline
             </Button>
           )}
         </div>
