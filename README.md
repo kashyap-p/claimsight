@@ -125,6 +125,8 @@ Each agent is a **real LLM call** with a specialized system prompt. Agents run w
 - [Node.js](https://nodejs.org/) 18+ (with npm) **or** [Bun](https://bun.sh/) 1.0+ (faster, recommended)
 - The `z-ai-web-dev-sdk` package (already in `package.json` — installed automatically)
 
+> **💡 Demo mode:** The app works out of the box without any API keys. When the z-ai SDK isn't configured, agents automatically fall back to realistic pre-written demo responses — the full 9-agent pipeline, RAG retrieval, citations, and audit gate all work with simulated data. You'll see a "demo mode" badge in the header. To enable real LLM calls, create a `.z-ai-config` file (see [LLM Configuration](#llm-configuration) below).
+
 ### Option A — Run with Node.js + npm
 
 ```bash
@@ -373,6 +375,43 @@ Copy `.env.example` to `.env` and modify as needed:
 ```bash
 cp .env.example .env
 ```
+
+---
+
+## LLM configuration
+
+### Demo mode (default — no setup needed)
+
+The app runs in **demo mode** by default. All 9 agents use realistic pre-written responses based on keyword matching and rule-based logic against your claim data. The full pipeline works — you'll see agents stream, RAG retrieval return cited clauses, fraud scoring, coverage analysis, and a final decision with citations.
+
+Demo mode is perfect for:
+- Exploring the UI and understanding the pipeline flow
+- Portfolio demonstrations
+- Testing the custom claim builder
+- Understanding how the agent orchestration works
+
+### Real LLM mode (optional)
+
+To enable real LLM-powered agent responses, create a `.z-ai-config` file. The z-ai-web-dev-sdk looks for it in these locations (checked in order):
+
+1. **Project root** — `/path/to/claimsight/.z-ai-config`
+2. **Home directory** — `~/.z-ai-config`
+3. **System-wide** — `/etc/.z-ai-config`
+
+The file should be valid JSON with this structure:
+
+```json
+{
+  "baseUrl": "https://your-api-endpoint/v1",
+  "apiKey": "your-api-key",
+  "token": "your-auth-token",
+  "userId": "your-user-id"
+}
+```
+
+When the config file is found, the app automatically switches from demo mode to real LLM mode — the "demo mode" badge in the header disappears, and all agents make real LLM calls with their specialized prompts.
+
+> **Note:** The `z-ai-web-dev-sdk` is the SDK used in the Z.ai development environment. If you're running this project elsewhere, you can either use demo mode or swap the SDK calls in `src/lib/agents.ts` for any LLM API (OpenAI, Anthropic, local models via Ollama, etc.) — the agent interface is a simple `async function llm(systemPrompt, userPrompt): Promise<string>`.
 
 ---
 
