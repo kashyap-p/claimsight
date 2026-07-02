@@ -24,6 +24,7 @@ export function SiteHeader({ onNav }: Props) {
         <nav className="flex items-center gap-1 text-sm overflow-x-auto scrollbar-thin">
           <NavBtn label="Claims Queue" onClick={() => onNav("dashboard")} />
           <NavBtn label="Pipeline" onClick={() => onNav("processor")} />
+          <NavBtn label="Custom Claim" onClick={() => onNav("custom")} />
           <NavBtn label="Eval Harness" onClick={() => onNav("evals")} />
           <NavBtn label="Architecture" onClick={() => onNav("architecture")} />
         </nav>

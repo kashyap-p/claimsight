@@ -12,6 +12,7 @@ import {
   GitBranch, Clock, Quote, CircleDollarSign, Activity,
 } from "lucide-react";
 import type { Claim } from "@/lib/claims";
+import type { CustomClaimData } from "./custom-claim-builder";
 
 // Agent definitions for the graph visualization
 const AGENTS = [
@@ -41,9 +42,10 @@ interface AgentEvent {
 
 interface Props {
   claimId: string | null;
+  customClaim: CustomClaimData | null;
 }
 
-export function ClaimProcessor({ claimId }: Props) {
+export function ClaimProcessor({ claimId, customClaim }: Props) {
   const [claim, setClaim] = useState<Claim | null>(null);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -53,8 +55,52 @@ export function ClaimProcessor({ claimId }: Props) {
   const eventLogRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Load claim detail
+  // Load claim detail — either a pre-loaded claim by ID, or build from custom data
   useEffect(() => {
+    if (customClaim) {
+      // Build a Claim object from the custom data for display
+      const customId = `CLM-CUSTOM-${Date.now().toString(36).toUpperCase()}`;
+      const built: Claim = {
+        id: customId,
+        claimant: customClaim.claimant || "Custom Claimant",
+        lob: customClaim.lob,
+        dateOfLoss: customClaim.dateOfLoss || new Date().toISOString().slice(0, 10),
+        reportedDate: new Date().toISOString().slice(0, 10),
+        status: "intake",
+        location: customClaim.location || "Unknown",
+        amount: customClaim.amount || 0,
+        narrative: customClaim.narrative,
+        documents:
+          customClaim.documents.filter((d) => d.content.trim().length > 0).length > 0
+            ? customClaim.documents
+                .filter((d) => d.content.trim().length > 0)
+                .map((d, i) => ({
+                  id: `doc-custom-${i + 1}`,
+                  type: "claim_form" as const,
+                  title: d.title || `Document ${i + 1}`,
+                  content: d.content,
+                }))
+            : [
+                {
+                  id: "doc-custom-1",
+                  type: "claim_form" as const,
+                  title: "Claim Narrative (provided by user)",
+                  content: customClaim.narrative,
+                },
+              ],
+        photos: customClaim.photos
+          .filter((p) => p.description.trim().length > 0)
+          .map((p, i) => ({ id: `ph-custom-${i + 1}`, description: p.description })),
+        policyId: customClaim.policyId,
+        expected: { decision: "review" as const, reason: "Custom claim", fraudFlag: false },
+      };
+      setClaim(built);
+      setAgentStatuses({});
+      setEvents([]);
+      setFinalState(null);
+      setActiveAgent(null);
+      return;
+    }
     if (!claimId) {
       setClaim(null);
       return;
@@ -68,10 +114,10 @@ export function ClaimProcessor({ claimId }: Props) {
     setEvents([]);
     setFinalState(null);
     setActiveAgent(null);
-  }, [claimId]);
+  }, [claimId, customClaim]);
 
   const handleRun = useCallback(async () => {
-    if (!claimId || running) return;
+    if ((!claimId && !customClaim) || running) return;
     setRunning(true);
     setAgentStatuses({});
     setEvents([]);
@@ -82,7 +128,15 @@ export function ClaimProcessor({ claimId }: Props) {
     abortRef.current = controller;
 
     try {
-      const resp = await fetch(`/api/process?claimId=${claimId}`, { signal: controller.signal });
+      // Use POST for custom claims, GET for pre-loaded claims
+      const resp = customClaim
+        ? await fetch("/api/process", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ claim: customClaim }),
+            signal: controller.signal,
+          })
+        : await fetch(`/api/process?claimId=${claimId}`, { signal: controller.signal });
       if (!resp.ok || !resp.body) throw new Error("Stream failed");
 
       const reader = resp.body.getReader();
@@ -126,7 +180,17 @@ export function ClaimProcessor({ claimId }: Props) {
       setRunning(false);
       setActiveAgent(null);
     }
-  }, [claimId, running]);
+  }, [claimId, customClaim, running]);
+
+  // Auto-run the pipeline when a custom claim is submitted
+  const autoRanRef = useRef<CustomClaimData | null>(null);
+  useEffect(() => {
+    if (customClaim && autoRanRef.current !== customClaim && !running) {
+      autoRanRef.current = customClaim;
+      const t = setTimeout(() => handleRun(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [customClaim, running, handleRun]);
 
   const handleEvent = useCallback((event: AgentEvent) => {
     if (event.type === "agent_start") {
@@ -161,7 +225,7 @@ export function ClaimProcessor({ claimId }: Props) {
     setActiveAgent(null);
   };
 
-  if (!claimId || !claim) {
+  if ((!claimId && !customClaim) || !claim) {
     return (
       <section id="processor" className="mx-auto max-w-6xl px-4 sm:px-6 py-12">
         <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
@@ -171,7 +235,7 @@ export function ClaimProcessor({ claimId }: Props) {
             </div>
             <h3 className="text-lg font-semibold mb-2">No claim selected yet</h3>
             <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-              Click a claim card above (look for the <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-bold align-middle">START HERE</span> badge) to load it here, then hit <span className="font-semibold text-foreground">Run Pipeline</span> to watch the 9 agents work.
+              Click a claim card above (look for the <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-bold align-middle">START HERE</span> badge) — or build a <span className="font-semibold text-foreground">custom claim</span> below — then hit <span className="font-semibold text-foreground">Run Pipeline</span> to watch the 9 agents work.
             </p>
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border">
