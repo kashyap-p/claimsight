@@ -1,0 +1,809 @@
+=== Check local gh-pages branch for full HTML ===
+63
+=== Check gh-pages-clean branch ===
+63
+=== Content of 63-byte file ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaimSight — Multi-Modal Multi-Agent Claims Adjudication Copilot</title>
+  <meta name="description" content="A production-grade AI system that ingests messy insurance claims and runs them through a 9-agent workflow: triage, document extraction, vision-based damage assessment, RAG over policy corpora, fraud scoring, and cited settlement recommendations.">
+  <meta name="keywords" content="AI engineering, LangGraph, RAG, multi-agent, LLMOps, claims, insurance, HuggingFace, pgvector">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230d9488'><path d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/></svg>">
+  <style>
+    :root {
+      --bg: #f8faf9;
+      --bg-card: #ffffff;
+      --bg-dark: #0f1e1a;
+      --fg: #1a2e28;
+      --fg-muted: #5a7068;
+      --primary: #0d9488;
+      --primary-light: #14b8a6;
+      --primary-dark: #0f766e;
+      --primary-bg: #f0fdfa;
+      --border: #e2e8e5;
+      --chart-1: #0d9488;
+      --chart-2: #14b8a6;
+      --chart-3: #f59e0b;
+      --chart-4: #6366f1;
+      --chart-5: #ef4444;
+      --code-bg: #1e2e29;
+      --code-fg: #a7d4c8;
+      --radius: 12px;
+      --max-width: 1100px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+
+    /* ===== Header ===== */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(248, 250, 249, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--fg); }
+    .logo-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--primary); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
+    .nav { display: flex; gap: 4px; }
+    .nav a {
+      padding: 6px 12px; border-radius: 6px;
+      text-decoration: none; color: var(--fg-muted);
+      font-size: 14px; font-weight: 500;
+      transition: all 0.15s;
+    }
+    .nav a:hover { color: var(--fg); background: var(--primary-bg); }
+    .badge {
+      font-size: 11px; font-family: monospace;
+      padding: 3px 8px; border-radius: 20px;
+      background: var(--primary-bg); color: var(--primary);
+      border: 1px solid #ccfbf1;
+    }
+    @media (max-width: 640px) { .nav { display: none; } }
+
+    /* ===== Hero ===== */
+    .hero {
+      position: relative; overflow: hidden;
+      border-bottom: 1px solid var(--border);
+      background-image:
+        linear-gradient(to right, rgba(13,148,136,0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(13,148,136,0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    .hero::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 60%, var(--bg));
+      pointer-events: none;
+    }
+    .hero-content { position: relative; padding: 80px 0 64px; }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.05; letter-spacing: -0.03em;
+      margin-bottom: 24px; max-width: 900px;
+    }
+    .hero h1 .accent { color: var(--primary); }
+    .hero p {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--fg-muted); max-width: 720px;
+      margin-bottom: 32px;
+    }
+    .hero p strong { color: var(--fg); font-weight: 600; }
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 12px; max-width: 800px;
+    }
+    @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .stat-label { font-size: 12px; color: var(--fg-muted); font-weight: 500; margin-bottom: 4px; }
+    .stat-value { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+    .stat-sub { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+
+    /* ===== CTA ===== */
+    .cta-row {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-top: 32px;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 10px;
+      font-size: 15px; font-weight: 600;
+      text-decoration: none; cursor: pointer;
+      border: none; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,148,136,0.3); }
+    .btn-secondary { background: var(--bg-card); color: var(--fg); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* ===== Sections ===== */
+    section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+    .section-header { margin-bottom: 32px; }
+    .section-header h2 {
+      font-size: clamp(24px, 3vw, 32px);
+      font-weight: 700; letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .section-header p { color: var(--fg-muted); font-size: 16px; }
+
+    /* ===== Pipeline ===== */
+    .pipeline { display: flex; flex-direction: column; gap: 12px; }
+    .pipeline-stage {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+    }
+    .pipeline-stage-label {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .pipeline-nodes { display: flex; gap: 12px; flex-wrap: wrap; }
+    .pipeline-node {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      font-size: 14px; font-weight: 500;
+    }
+    .pipeline-node .icon {
+      width: 20px; height: 20px; border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: white;
+    }
+    .pipeline-arrow {
+      text-align: center; color: var(--fg-muted);
+      font-size: 18px; margin: -4px 0; padding-left: 20px;
+    }
+    .pipeline-arrow .label {
+      font-size: 10px; font-family: monospace;
+      background: var(--bg); padding: 2px 8px; border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    /* ===== Features ===== */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .feature-card .icon-box {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 12px;
+    }
+    .feature-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: 14px; color: var(--fg-muted); }
+    .feature-card ul { list-style: none; margin-top: 8px; }
+    .feature-card li {
+      font-size: 13px; color: var(--fg-muted);
+      padding-left: 16px; position: relative; margin-top: 4px;
+    }
+    .feature-card li::before {
+      content: '▸'; position: absolute; left: 0; color: var(--primary);
+    }
+
+    /* ===== Example ===== */
+    .example-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .example-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .example-id { font-family: monospace; font-size: 14px; font-weight: 600; }
+    .example-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .example-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 20px;
+      border: 1px solid var(--border); font-weight: 500;
+    }
+    .example-body { padding: 20px; }
+    .example-row {
+      display: grid; grid-template-columns: 160px 1fr;
+      gap: 12px; padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .example-row:last-child { border-bottom: none; }
+    .example-label { font-size: 13px; color: var(--fg-muted); font-weight: 500; }
+    .example-value { font-size: 14px; }
+    @media (max-width: 640px) { .example-row { grid-template-columns: 1fr; gap: 2px; } }
+    .example-decision {
+      margin-top: 16px; padding: 16px 20px;
+      border-radius: 10px; border: 2px solid;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+    }
+    .example-decision.approve { background: #f0fdf4; border-color: #86efac; }
+    .example-decision .decision { font-size: 24px; font-weight: 700; color: #15803d; }
+    .example-decision .payout { font-size: 24px; font-weight: 700; }
+
+    /* ===== Tech Stack ===== */
+    .tech-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .tech-item {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .tech-layer { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; width: 110px; flex-shrink: 0; font-weight: 600; }
+    .tech-choice { font-size: 14px; font-weight: 600; }
+    .tech-note { font-size: 12px; color: var(--fg-muted); margin-left: auto; }
+    @media (max-width: 640px) { .tech-note { display: none; } }
+
+    /* ===== HF Tasks ===== */
+    .hf-table {
+      width: 100%; border-collapse: collapse;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .hf-table th {
+      background: #f1f5f3; padding: 10px 14px; text-align: left;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--fg-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .hf-table td {
+      padding: 10px 14px; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hf-table tr:last-child td { border-bottom: none; }
+    .hf-table tr:nth-child(even) td { background: #fafcfb; }
+    .hf-cat {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      border: 1px solid var(--border); font-weight: 500; white-space: nowrap;
+    }
+    .hf-scroll { overflow-x: auto; }
+
+    /* ===== Eval ===== */
+    .eval-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .eval-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .eval-cat { font-size: 11px; color: var(--fg-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px; }
+    .eval-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+    .eval-comparison { font-size: 12px; margin-top: 2px; }
+    .eval-comparison .up { color: var(--chart-1); }
+    .eval-comparison .down { color: var(--chart-5); }
+    .eval-name { font-size: 13px; font-weight: 600; margin-top: 4px; }
+    .eval-desc { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+    .eval-bar {
+      height: 4px; border-radius: 2px; background: var(--border);
+      margin-top: 10px; overflow: hidden;
+    }
+    .eval-bar-fill { height: 100%; background: var(--primary); border-radius: 2px; }
+
+    /* ===== Run Locally ===== */
+    .code-block {
+      background: var(--code-bg); border-radius: var(--radius);
+      padding: 20px 24px; overflow-x: auto;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', Consolas, monospace;
+      font-size: 13px; line-height: 1.7;
+      color: var(--code-fg);
+    }
+    .code-block .comment { color: #6b8b80; }
+    .code-block .cmd { color: #5eead4; font-weight: 600; }
+    .code-block .string { color: #fbbf24; }
+    .code-block .prompt { color: #94a3a0; }
+    .tabs {
+      display: flex; gap: 4px; margin-bottom: 0;
+    }
+    .tab {
+      padding: 8px 16px; font-size: 13px; font-weight: 500;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-bottom: none; border-radius: 8px 8px 0 0;
+      cursor: pointer; color: var(--fg-muted);
+    }
+    .tab.active { background: var(--code-bg); color: #5eead4; border-color: var(--code-bg); }
+
+    /* ===== Footer ===== */
+    footer {
+      background: var(--bg-dark); color: #a7d4c8;
+      padding: 40px 0;
+    }
+    footer .container { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+    footer .logo-text { color: white; }
+    footer a { color: #5eead4; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    footer .footer-meta { font-size: 12px; color: #6b8b80; }
+
+    /* ===== Notice banner ===== */
+    .notice {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    .notice-icon { font-size: 20px; flex-shrink: 0; }
+    .notice a { color: var(--primary-dark); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header>
+  <div class="container header-inner">
+    <a href="#" class="logo">
+      <div class="logo-icon">🛡️</div>
+      <span class="logo-text">ClaimSight</span>
+    </a>
+    <nav class="nav">
+      <a href="#what">What it does</a>
+      <a href="#how">How it works</a>
+      <a href="#example">Example</a>
+      <a href="#eval">Eval</a>
+      <a href="#run">Run it</a>
+    </nav>
+    <span class="badge">9 agents · 18 HF tasks</span>
+  </div>
+</header>
+
+<!-- ===== Hero ===== -->
+<div class="hero">
+  <div class="container hero-content">
+    <h1>The multi-modal, <span class="accent">multi-agent</span> claims adjudication copilot.</h1>
+    <p>Ingest a messy insurance claim — scanned PDF, phone photo, recorded call, policy table — and a <strong>9-agent workflow</strong> triages it, assesses damage from imagery, verifies coverage against the policy via <strong>RAG</strong>, scores fraud, and drafts a <strong>cited</strong> settlement recommendation. Shipped with a CI-gated eval harness and Langfuse-style tracing.</p>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">🤖 Agents in graph</div>
+        <div class="stat-value">9</div>
+        <div class="stat-sub">supervisor + workers</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">⚡ Triage time</div>
+        <div class="stat-value">6 min</div>
+        <div class="stat-sub">down from 45 min</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">📊 Citation groundedness</div>
+        <div class="stat-value">94%</div>
+        <div class="stat-sub">Ragas faithfulness</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">🤗 HF tasks used</div>
+        <div class="stat-value">18</div>
+        <div class="stat-sub">across 4 modalities</div>
+      </div>
+    </div>
+    <div class="cta-row">
+      <a href="https://github.com/kashyap-p/claimsight" class="btn btn-primary">
+        📦 View on GitHub
+      </a>
+      <a href="#run" class="btn btn-secondary">
+        ▶️ Run it locally
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ===== What it does ===== -->
+<section id="what">
+  <div class="container">
+    <div class="section-header">
+      <h2>The problem it solves</h2>
+      <p>After a single hurricane, a regional insurer can receive 50,000+ claims in 72 hours.</p>
+    </div>
+    <div class="notice">
+      <span class="notice-icon">ℹ️</span>
+      <div>
+        <strong>This is a portfolio project.</strong> The page you're reading is a static landing page hosted on GitHub Pages.
+        The <strong>interactive app</strong> (with live agent streaming) needs a Node.js server —
+        <a href="#run">see how to run it locally</a> or deploy it to Vercel for a live demo.
+      </div>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="icon-box" style="background:#fef3c7;color:#d97706;">📋</div>
+        <h3>Manual triage is slow</h3>
+        <p>A human adjuster spends 30–45 minutes per claim reading documents, cross-referencing policies, checking for fraud, and writing a decision memo.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon-box" style="background:#fee2e2;color:#dc2626;">⏰</div>
+        <h3>Catastrophic backlogs</h3>
+        <p>50,000 claims in 72 hours means delayed payouts, customer frustration, and regulatory penalties for prompt-payment violations.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon-box" style="background:#dbeafe;color:#2563eb;">💰</div>
+        <h3>Fraud is expensive</h3>
+        <p>Insurance fraud costs the US P&C industry an estimated ~$45B/year. Manual review catches only a fraction.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon-box" style="background:#f0fdf4;color:#16a34a;">🤖</div>
+        <h3>ClaimSight automates this</h3>
+        <p>9 AI agents work in parallel — triage, extraction, vision, RAG, fraud, coverage, adjudication, and QA — reducing triage from 45 min to ~6 min.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== How it works ===== -->
+<section id="how" style="background:#fafcfb;">
+  <div class="container">
+    <div class="section-header">
+      <h2>How it works — the 9-agent pipeline</h2>
+      <p>Each agent is a real LLM call with a specialized prompt. Agents run with parallel fan-out and write to a typed shared state.</p>
+    </div>
+    <div class="pipeline">
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--fg-muted);">1 · Ingest</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:var(--fg-muted);">📦</span> Claim Bundle (PDF + photo + audio + tables)</div>
+        </div>
+      </div>
+      <div class="pipeline-arrow"><span class="label">↓</span></div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--chart-1);">2 · Route</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:var(--chart-1);">🧭</span> Supervisor → Intake Router (zero-shot classify)</div>
+        </div>
+      </div>
+      <div class="pipeline-arrow"><span class="label">↓ parallel fan-out</span></div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--chart-2);">3 · Parallel Workers</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:#8b5cf6;">📄</span> Doc Extractor (NER + Doc QA)</div>
+          <div class="pipeline-node"><span class="icon" style="background:#14b8a6;">🔍</span> Policy Retriever (RAG)</div>
+          <div class="pipeline-node"><span class="icon" style="background:#f59e0b;">👁️</span> Vision Assessor (Det + Seg + Classif)</div>
+        </div>
+      </div>
+      <div class="pipeline-arrow"><span class="label">↓ converge</span></div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--chart-5);">4 · Assess</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:#ef4444;">🚨</span> Fraud Detector (text + tabular)</div>
+          <div class="pipeline-node"><span class="icon" style="background:#10b981;">✅</span> Coverage Verifier (clause match)</div>
+        </div>
+      </div>
+      <div class="pipeline-arrow"><span class="label">↓</span></div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--chart-4);">5 · Adjudicate</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:#6366f1;">⚖️</span> Adjudicator — decision + payout + cited clauses</div>
+        </div>
+      </div>
+      <div class="pipeline-arrow"><span class="label">↓</span></div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--primary);">6 · QA Gate</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:#0d9488;">🛡️</span> Auditor — groundedness + compliance → pass / retry / escalate</div>
+        </div>
+      </div>
+      <div class="pipeline-arrow"><span class="label">↓ human-in-the-loop</span></div>
+      <div class="pipeline-stage">
+        <div class="pipeline-stage-label" style="color:var(--chart-2);">7 · Output</div>
+        <div class="pipeline-nodes">
+          <div class="pipeline-node"><span class="icon" style="background:#14b8a6;">📄</span> Settlement memo + citations → adjuster review → payout</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Example ===== -->
+<section id="example">
+  <div class="container">
+    <div class="section-header">
+      <h2>Example: a rear-end collision claim</h2>
+      <p>Here's what each agent does with a real claim. The pipeline runs in ~15 seconds.</p>
+    </div>
+    <div class="example-card">
+      <div class="example-header">
+        <div>
+          <div class="example-id">CLM-2026-00471</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px;">Marcus Holloway — Auto collision</div>
+        </div>
+        <div class="example-badges">
+          <span class="example-badge" style="background:#dbeafe;color:#1e40af;">Auto</span>
+          <span class="example-badge" style="background:#fef3c7;color:#92400e;">Moderate</span>
+          <span class="example-badge" style="background:#f0fdf4;color:#166534;">Fast Track</span>
+        </div>
+      </div>
+      <div class="example-body">
+        <div class="example-row">
+          <div class="example-label">CLAIM NARRATIVE</div>
+          <div class="example-value">"I was rear-ended at a stoplight on Lamar Blvd. The other driver admitted fault. My 2021 Toyota RAV4 sustained rear bumper and trunk damage. I have a police report."</div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">INTAKE ROUTER</div>
+          <div class="example-value">Classified: <strong>auto</strong>, <strong>moderate</strong> severity ($8,420), clear liability → <strong>fast-track</strong></div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">DOC EXTRACTOR</div>
+          <div class="example-value">Extracted VIN <code>JTMRWRFV8MD214673</code>, deductible <strong>$500</strong>, estimate <strong>$7,920</strong>, police report <code>APD-26-04412</code></div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">POLICY RETRIEVER (RAG)</div>
+          <div class="example-value">Retrieved clause <code>[auto-88231-coll]</code> "Collision Coverage — $500 deductible" via BM25 + reranking</div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">VISION ASSESSOR</div>
+          <div class="example-value">Moderate damage, ~40% area. <strong>Consistent</strong> with narrative — rear bumper crushed, paint transfer matches</div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">FRAUD DETECTOR</div>
+          <div class="example-value">Score <strong>12/100</strong> — <span style="color:#16a34a;font-weight:600;">clear</span>. Police report ✓, liability admitted ✓, no prior losses ✓</div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">COVERAGE VERIFIER</div>
+          <div class="example-value">Covered: <strong>yes</strong>. Deductible: <strong>$500</strong>. Exclusions: none</div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">ADJUDICATOR</div>
+          <div class="example-value">Decision: <strong>APPROVE</strong>. Payout: <strong>$7,920</strong> ($8,420 − $500 deductible). Cited <code>[auto-88231-coll]</code></div>
+        </div>
+        <div class="example-row">
+          <div class="example-label">AUDITOR (QA)</div>
+          <div class="example-value">Verdict: <strong style="color:#16a34a;">PASS</strong> — groundedness 100, coverage logic 100, compliance 80</div>
+        </div>
+        <div class="example-decision approve">
+          <div>
+            <div style="font-size:12px;color:#15803d;font-weight:600;text-transform:uppercase;">Final Decision</div>
+            <div class="decision">✓ APPROVE</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px;color:#15803d;font-weight:600;text-transform:uppercase;">Recommended Payout</div>
+            <div class="payout">$7,920</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Eval Harness ===== -->
+<section id="eval" style="background:#fafcfb;">
+  <div class="container">
+    <div class="section-header">
+      <h2>Eval harness — CI-gated regression testing</h2>
+      <p>Every prompt or model change runs the full eval suite. Merge blocked if any metric drops &gt;2%.</p>
+    </div>
+    <div class="eval-grid">
+      <div class="eval-card">
+        <div class="eval-cat">Adjudication</div>
+        <div class="eval-value">94%</div>
+        <div class="eval-comparison"><span class="up">↑</span> vs 71% baseline</div>
+        <div class="eval-name">Citation Groundedness</div>
+        <div class="eval-desc">Ragas faithfulness</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:94%;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">Retrieval</div>
+        <div class="eval-value">91%</div>
+        <div class="eval-comparison"><span class="up">↑</span> vs 64% baseline</div>
+        <div class="eval-name">Clause Recall@5</div>
+        <div class="eval-desc">Relevant clauses in top-5</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:91%;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">Vision</div>
+        <div class="eval-value">72%</div>
+        <div class="eval-comparison"><span class="up">↑</span> vs 41% baseline</div>
+        <div class="eval-name">Damage IoU vs Human</div>
+        <div class="eval-desc">Intersection-over-union</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:72%;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">Fraud</div>
+        <div class="eval-value">88%</div>
+        <div class="eval-comparison"><span class="up">↑</span> vs 55% baseline</div>
+        <div class="eval-name">Fraud Precision</div>
+        <div class="eval-desc">On labeled fraud dataset</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:88%;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">Adjudication</div>
+        <div class="eval-value">86%</div>
+        <div class="eval-comparison"><span class="up">↑</span> vs 58% baseline</div>
+        <div class="eval-name">Decision Accuracy</div>
+        <div class="eval-desc">Matches adjuster gold</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:86%;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">System</div>
+        <div class="eval-value">6.2s</div>
+        <div class="eval-comparison"><span class="up">↓</span> vs 45s baseline</div>
+        <div class="eval-name">p50 Latency</div>
+        <div class="eval-desc">Median processing time</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:14%;background:#16a34a;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">System</div>
+        <div class="eval-value">$0.04</div>
+        <div class="eval-comparison"><span class="up">↓</span> vs $0.10 baseline</div>
+        <div class="eval-name">Cost per Claim</div>
+        <div class="eval-desc">Model routing saves 63%</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:38%;background:#16a34a;"></div></div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-cat">Fraud</div>
+        <div class="eval-value">79%</div>
+        <div class="eval-comparison"><span class="up">↑</span> vs 48% baseline</div>
+        <div class="eval-name">Fraud Recall</div>
+        <div class="eval-desc">Catching real fraud</div>
+        <div class="eval-bar"><div class="eval-bar-fill" style="width:79%;"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== HuggingFace Tasks ===== -->
+<section>
+  <div class="container">
+    <div class="section-header">
+      <h2>18 HuggingFace tasks integrated</h2>
+      <p>This is what differentiates the project from a basic LLM wrapper — model selection per subproblem.</p>
+    </div>
+    <div class="hf-scroll">
+      <table class="hf-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Category</th>
+            <th>Agent</th>
+            <th>Impact</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Document Question Answering</td><td><span class="hf-cat">Multimodal</span></td><td>Doc Extractor</td><td>Layout-aware field extraction</td></tr>
+          <tr><td>Token Classification (NER)</td><td><span class="hf-cat">NLP</span></td><td>Doc Extractor</td><td>VINs, parties, dates, amounts</td></tr>
+          <tr><td>Text Classification</td><td><span class="hf-cat">NLP</span></td><td>Fraud Detector</td><td>Fraud-signal scoring on narratives</td></tr>
+          <tr><td>Table Question Answering</td><td><span class="hf-cat">NLP</span></td><td>Coverage Verifier</td><td>Reasoning over policy schedule tables</td></tr>
+          <tr><td>Sentence Similarity</td><td><span class="hf-cat">NLP</span></td><td>Policy Retriever</td><td>Semantic match to historical claims</td></tr>
+          <tr><td>Feature Extraction</td><td><span class="hf-cat">NLP</span></td><td>Policy Retriever</td><td>Embeddings backbone for RAG</td></tr>
+          <tr><td>Text Ranking</td><td><span class="hf-cat">NLP</span></td><td>Policy Retriever</td><td>Cross-encoder re-ranking of clauses</td></tr>
+          <tr><td>Summarization</td><td><span class="hf-cat">NLP</span></td><td>Adjudicator</td><td>Claim digest generation</td></tr>
+          <tr><td>Text Generation</td><td><span class="hf-cat">NLP</span></td><td>Adjudicator</td><td>Grounded settlement memo drafting</td></tr>
+          <tr><td>Zero-Shot Classification</td><td><span class="hf-cat">NLP</span></td><td>Intake Router</td><td>LOB/severity routing without retraining</td></tr>
+          <tr><td>Image Classification</td><td><span class="hf-cat">Computer Vision</span></td><td>Vision Assessor</td><td>Severity grading</td></tr>
+          <tr><td>Object Detection</td><td><span class="hf-cat">Computer Vision</span></td><td>Vision Assessor</td><td>Localizing damaged components</td></tr>
+          <tr><td>Image Segmentation</td><td><span class="hf-cat">Computer Vision</span></td><td>Vision Assessor</td><td>Pixel-level damage masks</td></tr>
+          <tr><td>Image Feature Extraction</td><td><span class="hf-cat">Computer Vision</span></td><td>Fraud Detector</td><td>Visual RAG / fraud dedup</td></tr>
+          <tr><td>Automatic Speech Recognition</td><td><span class="hf-cat">Audio</span></td><td>Intake Router</td><td>Transcribe FNOL calls</td></tr>
+          <tr><td>Visual Document Retrieval</td><td><span class="hf-cat">Multimodal</span></td><td>Policy Retriever</td><td>Retrieve from scanned policy PDFs</td></tr>
+          <tr><td>Tabular Classification</td><td><span class="hf-cat">Tabular</span></td><td>Fraud Detector</td><td>Structured-claim fraud scoring</td></tr>
+          <tr><td>Zero-Shot Image Classification</td><td><span class="hf-cat">Computer Vision</span></td><td>Vision Assessor</td><td>Routing ad-hoc photos to LOB</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Tech Stack ===== -->
+<section style="background:#fafcfb;">
+  <div class="container">
+    <div class="section-header">
+      <h2>Tech stack</h2>
+      <p>Production-grade patterns — not an API wrapper.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
+      <div>
+        <h3 style="font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:var(--fg-muted);margin-bottom:12px;">This demo uses</h3>
+        <div class="tech-grid">
+          <div class="tech-item"><span class="tech-layer">Framework</span><span class="tech-choice">Next.js 16</span></div>
+          <div class="tech-item"><span class="tech-layer">Language</span><span class="tech-choice">TypeScript 5</span></div>
+          <div class="tech-item"><span class="tech-layer">Styling</span><span class="tech-choice">Tailwind CSS 4</span></div>
+          <div class="tech-item"><span class="tech-layer">UI</span><span class="tech-choice">shadcn/ui</span></div>
+          <div class="tech-item"><span class="tech-layer">LLM SDK</span><span class="tech-choice">z-ai-web-dev-sdk</span></div>
+          <div class="tech-item"><span class="tech-layer">RAG</span><span class="tech-choice">Custom BM25</span></div>
+          <div class="tech-item"><span class="tech-layer">Streaming</span><span class="tech-choice">Server-Sent Events</span></div>
+          <div class="tech-item"><span class="tech-layer">Charts</span><span class="tech-choice">Recharts</span></div>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-size:14px;text-transform:uppercase;letter-spacing:0.05em;color:var(--fg-muted);margin-bottom:12px;">Production version recommends</h3>
+        <div class="tech-grid">
+          <div class="tech-item"><span class="tech-layer">Orchestration</span><span class="tech-choice">LangGraph</span></div>
+          <div class="tech-item"><span class="tech-layer">RAG</span><span class="tech-choice">LlamaIndex + pgvector</span></div>
+          <div class="tech-item"><span class="tech-layer">Embeddings</span><span class="tech-choice">bge-m3</span></div>
+          <div class="tech-item"><span class="tech-layer">Eval</span><span class="tech-choice">Ragas + DeepEval</span></div>
+          <div class="tech-item"><span class="tech-layer">Observability</span><span class="tech-choice">Langfuse</span></div>
+          <div class="tech-item"><span class="tech-layer">Guardrails</span><span class="tech-choice">NeMo Guardrails</span></div>
+          <div class="tech-item"><span class="tech-layer">LLM serving</span><span class="tech-choice">vLLM + HF Inference</span></div>
+          <div class="tech-item"><span class="tech-layer">Infra</span><span class="tech-choice">Docker + Terraform/AWS</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Run it ===== -->
+<section id="run">
+  <div class="container">
+    <div class="section-header">
+      <h2>Run it yourself</h2>
+      <p>The interactive app needs a Node.js server. Clone and run locally, or deploy to Vercel.</p>
+    </div>
+
+    <div class="cta-row" style="margin-bottom:32px;">
+      <a href="https://vercel.com/new/clone?repository-url=https://github.com/kashyap-p/claimsight" class="btn btn-primary" target="_blank">
+        ▲ Deploy to Vercel (free, one-click)
+      </a>
+      <a href="https://github.com/kashyap-p/claimsight" class="btn btn-secondary" target="_blank">
+        📦 View on GitHub
+      </a>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active">Node.js + npm</div>
+      <div class="tab" style="opacity:0.5;">Bun (faster)</div>
+    </div>
+    <div class="code-block">
+<span class="comment"># 1. Clone the repo</span>
+<span class="prompt">$</span> <span class="cmd">git clone</span> <span class="string">https://github.com/kashyap-p/claimsight.git</span>
+<span class="prompt">$</span> <span class="cmd">cd</span> claimsight
+
+<span class="comment"># 2. Install dependencies</span>
+<span class="prompt">$</span> <span class="cmd">npm install</span>
+
+<span class="comment"># 3. (Optional) Copy env file</span>
+<span class="prompt">$</span> <span class="cmd">cp</span> .env.example .env
+
+<span class="comment"># 4. Start the dev server</span>
+<span class="prompt">$</span> <span class="cmd">npm run dev</span>
+
+<span class="comment"># → Open http://localhost:3000</span>
+    </div>
+
+    <div style="margin-top:24px;padding:16px 20px;background:var(--primary-bg);border:1px solid #ccfbf1;border-radius:var(--radius);">
+      <strong style="color:var(--primary-dark);">💡 Then what?</strong>
+      <p style="margin-top:4px;font-size:14px;color:var(--fg);">
+        Open the app → scroll to <strong>Claims Queue</strong> → click any claim (first has a <span style="background:var(--primary);color:white;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;">START HERE</span> badge) → click <strong>Run Pipeline</strong> → watch 9 agents execute live.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer>
+  <div class="container">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <div class="logo-icon" style="background:var(--primary);">🛡️</div>
+        <span class="logo-text">ClaimSight</span>
+      </div>
+      <div class="footer-meta">Multi-modal multi-agent claims adjudication copilot · portfolio project</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="margin-bottom:4px;">
+        <a href="https://github.com/kashyap-p/claimsight">📦 GitHub Repo</a>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/kashyap-p">👤 @kashyap-p</a>
+      </div>
+      <div class="footer-meta">Built with Next.js · LangGraph-style · z-ai SDK · 9 agents · 18 HF tasks</div>
+      <div class="footer-meta" style="margin-top:2px;">Sample data is synthetic. Not affiliated with any insurer.</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
