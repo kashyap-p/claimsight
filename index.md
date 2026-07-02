@@ -128,34 +128,97 @@ Each agent is a **real LLM call** with a specialized system prompt. Agents run w
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+ or [Bun](https://bun.sh/) (recommended)
-- The `z-ai-web-dev-sdk` package (already in `package.json`)
+- [Node.js](https://nodejs.org/) 18+ (with npm) **or** [Bun](https://bun.sh/) 1.0+ (faster, recommended)
+- The `z-ai-web-dev-sdk` package (already in `package.json` — installed automatically)
 
-### Installation
+### Option A — Run with Node.js + npm
 
 ```bash
-# Clone the repo
-git clone https://github.com/YOUR_USERNAME/claimsight.git
+# 1. Clone the repo
+git clone https://github.com/kashyap-p/claimsight.git
 cd claimsight
 
-# Install dependencies
-bun install
+# 2. Install dependencies
+npm install
 
-# Copy env file (optional — only needed if you add a database)
+# 3. Copy env file (optional — only needed if you add a database)
 cp .env.example .env
 
-# Start the dev server
+# 4. Start the dev server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Option B — Run with Bun (faster startup, recommended)
+
+```bash
+# 1. Install Bun (if you don't have it)
+curl -fsSL https://bun.sh/install | bash
+
+# 2. Clone the repo
+git clone https://github.com/kashyap-p/claimsight.git
+cd claimsight
+
+# 3. Install dependencies
+bun install
+
+# 4. Copy env file (optional — only needed if you add a database)
+cp .env.example .env
+
+# 5. Start the dev server
 bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Using PM2 for persistent dev server (optional)
+### Option C — Run with Node.js + pnpm / yarn
 
 ```bash
-bun add -d pm2
-npx pm2 start "bun run dev" --name claimsight
-npx pm2 logs claimsight
+# Using pnpm
+git clone https://github.com/kashyap-p/claimsight.git
+cd claimsight
+pnpm install
+pnpm dev
+
+# Using yarn
+git clone https://github.com/kashyap-p/claimsight.git
+cd claimsight
+yarn install
+yarn dev
+```
+
+### Production build
+
+```bash
+# With npm
+npm run build
+npm start
+
+# With bun
+bun run build
+bun run start
+```
+
+### Using PM2 for persistent dev server (optional)
+
+Keeps the server alive and auto-restarts on crashes — useful for long-running demos.
+
+```bash
+# Install pm2
+npm install -g pm2
+# or: bun add -d pm2
+
+# Start the server under pm2
+pm2 start "npm run dev" --name claimsight
+# or with bun: pm2 start "bun run dev" --name claimsight
+
+# View logs
+pm2 logs claimsight
+
+# Stop / restart
+pm2 stop claimsight
+pm2 restart claimsight
 ```
 
 ---
@@ -278,11 +341,43 @@ Each claim includes documents (FNOL forms, police reports, repair estimates), ph
 
 ## Scripts
 
+All scripts work with both `npm run <script>` and `bun run <script>`.
+
 ```bash
-bun run dev      # Start dev server (port 3000)
-bun run build    # Production build
-bun run lint     # ESLint check
-bun run db:push  # Push Prisma schema to database (optional)
+# Development
+npm run dev       # or: bun run dev
+# → Starts Next.js dev server on http://localhost:3000
+
+# Production
+npm run build     # or: bun run build
+# → Creates an optimized production build in .next/
+npm run start     # or: bun run start
+# → Starts the production server (requires build first)
+
+# Code quality
+npm run lint      # or: bun run lint
+# → Runs ESLint to check code quality and Next.js rules
+
+# Database (optional — only if you add Prisma models)
+npm run db:push   # or: bun run db:push
+# → Pushes prisma/schema.prisma to the SQLite database
+npm run db:generate  # or: bun run db:generate
+# → Generates the Prisma Client
+npm run db:migrate   # or: bun run db:migrate
+# → Creates and applies a database migration
+npm run db:reset     # or: bun run db:reset
+# → Resets the database (destructive!)
+```
+
+### Available environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `file:./db/custom.db` | SQLite database path (only needed if you use Prisma) |
+
+Copy `.env.example` to `.env` and modify as needed:
+```bash
+cp .env.example .env
 ```
 
 ---

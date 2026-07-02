@@ -1,0 +1,10 @@
+title: ClaimSight
+description: >-
+  A multi-modal, multi-agent insurance claims adjudication copilot.
+  9-agent LangGraph-style workflow with RAG, vision assessment, fraud
+  detection, and cited decisions.
+theme: jekyll-theme-minimal
+show_downloads: true
+github:
+  repository_url: https://github.com/kashyap-p/claimsight
+  owner_url: https://github.com/kashyap-p
