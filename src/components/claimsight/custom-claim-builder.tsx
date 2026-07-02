@@ -16,8 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Trash2, Play, Wand2, ChevronDown, ChevronUp,
-  FileText, Eye, Lightbulb, AlertCircle,
+  Plus, Trash2, Play, Wand2, FileText, Eye, Lightbulb, AlertCircle,
 } from "lucide-react";
 
 export interface CustomClaimData {

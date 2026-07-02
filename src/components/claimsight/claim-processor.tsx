@@ -5,11 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Loader2, Play, RotateCcw, CheckCircle2, AlertTriangle, XCircle,
   Cpu, Search, FileText, Eye, ShieldAlert, Gavel, ClipboardCheck,
-  GitBranch, Clock, Quote, CircleDollarSign, Activity,
+  GitBranch, Quote, CircleDollarSign, Activity,
 } from "lucide-react";
 import type { Claim } from "@/lib/claims";
 import type { CustomClaimData } from "./custom-claim-builder";

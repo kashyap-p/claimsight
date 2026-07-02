@@ -8,37 +8,50 @@ export const maxDuration = 120;
 // POST /api/process  { claim: {...} }      — run a custom user-built claim
 // Returns a Server-Sent Events stream of agent events as the pipeline executes.
 
-function buildStream(claim: Claim) {
+function buildStream(claim: Claim, signal: AbortSignal) {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
       const send = (event: AgentEvent) => {
+        if (signal.aborted) return;
         const data = `data: ${JSON.stringify(event)}\n\n`;
         controller.enqueue(encoder.encode(data));
       };
 
       try {
         for await (const event of runPipeline(claim)) {
+          if (signal.aborted) break;
           send(event);
         }
       } catch (err: any) {
-        send({
-          type: "agent_error",
-          agentId: "supervisor",
-          agentName: "Supervisor",
-          timestamp: Date.now(),
-          error: err?.message ?? "Pipeline failure",
-        });
+        if (!signal.aborted) {
+          send({
+            type: "agent_error",
+            agentId: "supervisor",
+            agentName: "Supervisor",
+            timestamp: Date.now(),
+            error: err?.message ?? "Pipeline failure",
+          });
+        }
       } finally {
-        controller.enqueue(encoder.encode("event: done\ndata: {}\n\n"));
-        controller.close();
+        try {
+          if (!signal.aborted) {
+            controller.enqueue(encoder.encode("event: done\ndata: {}\n\n"));
+          }
+          controller.close();
+        } catch {
+          // controller already closed (client aborted) — safe to ignore
+        }
       }
+    },
+    cancel() {
+      // Client disconnected — the signal handles cleanup
     },
   });
 }
 
-function streamResponse(claim: Claim) {
-  return new Response(buildStream(claim), {
+function streamResponse(claim: Claim, signal: AbortSignal) {
+  return new Response(buildStream(claim, signal), {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
@@ -67,7 +80,7 @@ export async function GET(req: Request) {
     });
   }
 
-  return streamResponse(claim);
+  return streamResponse(claim, req.signal);
 }
 
 export async function POST(req: Request) {
@@ -128,5 +141,5 @@ export async function POST(req: Request) {
     expected: { decision: "review", reason: "Custom claim — no ground truth", fraudFlag: false },
   };
 
-  return streamResponse(claim);
+  return streamResponse(claim, req.signal);
 }

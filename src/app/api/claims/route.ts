@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { claims } from "@/lib/claims";
 
-export const dynamic = "force-dynamic";
+// Static data — safe to cache. Revalidate every 5 min in case claims change.
+export const revalidate = 300;
 
 export async function GET() {
   return NextResponse.json(

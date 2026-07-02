@@ -67,6 +67,7 @@ export type AgentId =
   | "retriever"
   | "vision"
   | "fraud"
+  | "coverage"
   | "adjudicator"
   | "auditor";
 
@@ -460,7 +461,7 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
 
   // 3. Fraud + Coverage (depend on prior results, can run in parallel)
   yield { type: "agent_start", agentId: "fraud", agentName: "Fraud Detector", timestamp: Date.now() };
-  yield { type: "agent_start", agentId: "supervisor", agentName: "Coverage Verifier", timestamp: Date.now() };
+  yield { type: "agent_start", agentId: "coverage", agentName: "Coverage Verifier", timestamp: Date.now() };
   const [fraudT0, covT0] = [Date.now(), Date.now()];
   const [fraudP, covP] = [
     fraudAgent(claim, state.extraction, state.damageAssessment).then((r) => ({ r, t: Date.now() - fraudT0 })),
@@ -487,7 +488,7 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
     state.coverageAnalysis = covRes.value.r;
     yield {
       type: "agent_complete",
-      agentId: "supervisor",
+      agentId: "coverage",
       agentName: "Coverage Verifier",
       timestamp: Date.now(),
       durationMs: covRes.value.t,
@@ -495,7 +496,7 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
       state: { coverageAnalysis: state.coverageAnalysis },
     };
   } else {
-    yield { type: "agent_error", agentId: "supervisor", agentName: "Coverage Verifier", timestamp: Date.now(), error: String(covRes.reason) };
+    yield { type: "agent_error", agentId: "coverage", agentName: "Coverage Verifier", timestamp: Date.now(), error: String(covRes.reason) };
   }
 
   // 4. Adjudicator
@@ -533,6 +534,15 @@ export async function* runPipeline(claim: Claim): AsyncGenerator<AgentEvent> {
   } catch (e: any) {
     yield { type: "agent_error", agentId: "auditor", agentName: "Auditor (QA Gate)", timestamp: Date.now(), error: e?.message };
   }
+
+  // Supervisor completes after all workers finish
+  yield {
+    type: "agent_complete",
+    agentId: "supervisor",
+    agentName: "Supervisor",
+    timestamp: Date.now(),
+    result: "Orchestrated full pipeline — all agents complete.",
+  };
 
   yield { type: "pipeline_complete", agentId: "auditor", agentName: "Pipeline", timestamp: Date.now(), state: state };
 }

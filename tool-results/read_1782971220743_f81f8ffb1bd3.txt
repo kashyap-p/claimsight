@@ -1,0 +1,744 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useRef, useState } from "react";
+     4→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+     5→import { Badge } from "@/components/ui/badge";
+     6→import { Button } from "@/components/ui/button";
+     7→import { Separator } from "@/components/ui/separator";
+     8→import { ScrollArea } from "@/components/ui/scroll-area";
+     9→import {
+    10→  Loader2, Play, RotateCcw, CheckCircle2, AlertTriangle, XCircle,
+    11→  Cpu, Search, FileText, Eye, ShieldAlert, Gavel, ClipboardCheck,
+    12→  GitBranch, Clock, Quote, CircleDollarSign, Activity,
+    13→} from "lucide-react";
+    14→import type { Claim } from "@/lib/claims";
+    15→import type { CustomClaimData } from "./custom-claim-builder";
+    16→
+    17→// Agent definitions for the graph visualization
+    18→const AGENTS = [
+    19→  { id: "supervisor", name: "Supervisor", icon: GitBranch, color: "var(--primary)", desc: "Orchestrates the graph" },
+    20→  { id: "router", name: "Intake Router", icon: Cpu, color: "#0ea5e9", desc: "Classifies LOB & severity" },
+    21→  { id: "extractor", name: "Document Extractor", icon: FileText, color: "#8b5cf6", desc: "NER + Doc QA on forms" },
+    22→  { id: "retriever", name: "Policy Retriever", icon: Search, color: "#14b8a6", desc: "RAG over policy corpus" },
+    23→  { id: "vision", name: "Vision Assessor", icon: Eye, color: "#f59e0b", desc: "Det + Seg + Classif" },
+    24→  { id: "fraud", name: "Fraud Detector", icon: ShieldAlert, color: "#ef4444", desc: "Text + tabular signals" },
+    25→  { id: "coverage", name: "Coverage Verifier", icon: ClipboardCheck, color: "#10b981", desc: "Clause matching" },
+    26→  { id: "adjudicator", name: "Adjudicator", icon: Gavel, color: "#6366f1", desc: "Cited recommendation" },
+    27→  { id: "auditor", name: "Auditor", icon: ShieldAlert, color: "#0d9488", desc: "QA gate" },
+    28→] as const;
+    29→
+    30→type AgentStatus = "idle" | "running" | "done" | "error";
+    31→
+    32→interface AgentEvent {
+    33→  type: "agent_start" | "agent_complete" | "agent_error" | "pipeline_complete";
+    34→  agentId: string;
+    35→  agentName: string;
+    36→  timestamp: number;
+    37→  durationMs?: number;
+    38→  result?: string;
+    39→  state?: any;
+    40→  error?: string;
+    41→}
+    42→
+    43→interface Props {
+    44→  claimId: string | null;
+    45→  customClaim: CustomClaimData | null;
+    46→}
+    47→
+    48→export function ClaimProcessor({ claimId, customClaim }: Props) {
+    49→  const [claim, setClaim] = useState<Claim | null>(null);
+    50→  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+    51→  const [events, setEvents] = useState<AgentEvent[]>([]);
+    52→  const [finalState, setFinalState] = useState<any>(null);
+    53→  const [running, setRunning] = useState(false);
+    54→  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+    55→  const eventLogRef = useRef<HTMLDivElement>(null);
+    56→  const abortRef = useRef<AbortController | null>(null);
+    57→
+    58→  // Load claim detail — either a pre-loaded claim by ID, or build from custom data
+    59→  useEffect(() => {
+    60→    if (customClaim) {
+    61→      // Build a Claim object from the custom data for display
+    62→      const customId = `CLM-CUSTOM-${Date.now().toString(36).toUpperCase()}`;
+    63→      const built: Claim = {
+    64→        id: customId,
+    65→        claimant: customClaim.claimant || "Custom Claimant",
+    66→        lob: customClaim.lob,
+    67→        dateOfLoss: customClaim.dateOfLoss || new Date().toISOString().slice(0, 10),
+    68→        reportedDate: new Date().toISOString().slice(0, 10),
+    69→        status: "intake",
+    70→        location: customClaim.location || "Unknown",
+    71→        amount: customClaim.amount || 0,
+    72→        narrative: customClaim.narrative,
+    73→        documents:
+    74→          customClaim.documents.filter((d) => d.content.trim().length > 0).length > 0
+    75→            ? customClaim.documents
+    76→                .filter((d) => d.content.trim().length > 0)
+    77→                .map((d, i) => ({
+    78→                  id: `doc-custom-${i + 1}`,
+    79→                  type: "claim_form" as const,
+    80→                  title: d.title || `Document ${i + 1}`,
+    81→                  content: d.content,
+    82→                }))
+    83→            : [
+    84→                {
+    85→                  id: "doc-custom-1",
+    86→                  type: "claim_form" as const,
+    87→                  title: "Claim Narrative (provided by user)",
+    88→                  content: customClaim.narrative,
+    89→                },
+    90→              ],
+    91→        photos: customClaim.photos
+    92→          .filter((p) => p.description.trim().length > 0)
+    93→          .map((p, i) => ({ id: `ph-custom-${i + 1}`, description: p.description })),
+    94→        policyId: customClaim.policyId,
+    95→        expected: { decision: "review" as const, reason: "Custom claim", fraudFlag: false },
+    96→      };
+    97→      setClaim(built);
+    98→      setAgentStatuses({});
+    99→      setEvents([]);
+   100→      setFinalState(null);
+   101→      setActiveAgent(null);
+   102→      return;
+   103→    }
+   104→    if (!claimId) {
+   105→      setClaim(null);
+   106→      return;
+   107→    }
+   108→    fetch(`/api/claims/${claimId}`)
+   109→      .then((r) => r.json())
+   110→      .then((data) => setClaim(data))
+   111→      .catch(() => setClaim(null));
+   112→    // Reset state on new claim
+   113→    setAgentStatuses({});
+   114→    setEvents([]);
+   115→    setFinalState(null);
+   116→    setActiveAgent(null);
+   117→  }, [claimId, customClaim]);
+   118→
+   119→  const handleRun = useCallback(async () => {
+   120→    if ((!claimId && !customClaim) || running) return;
+   121→    setRunning(true);
+   122→    setAgentStatuses({});
+   123→    setEvents([]);
+   124→    setFinalState(null);
+   125→    setActiveAgent(null);
+   126→
+   127→    const controller = new AbortController();
+   128→    abortRef.current = controller;
+   129→
+   130→    try {
+   131→      // Use POST for custom claims, GET for pre-loaded claims
+   132→      const resp = customClaim
+   133→        ? await fetch("/api/process", {
+   134→            method: "POST",
+   135→            headers: { "Content-Type": "application/json" },
+   136→            body: JSON.stringify({ claim: customClaim }),
+   137→            signal: controller.signal,
+   138→          })
+   139→        : await fetch(`/api/process?claimId=${claimId}`, { signal: controller.signal });
+   140→      if (!resp.ok || !resp.body) throw new Error("Stream failed");
+   141→
+   142→      const reader = resp.body.getReader();
+   143→      const decoder = new TextDecoder();
+   144→      let buffer = "";
+   145→
+   146→      while (true) {
+   147→        const { done, value } = await reader.read();
+   148→        if (done) break;
+   149→        buffer += decoder.decode(value, { stream: true });
+   150→        const lines = buffer.split("\n");
+   151→        buffer = lines.pop() || "";
+   152→
+   153→        for (const line of lines) {
+   154→          if (line.startsWith("data: ")) {
+   155→            const jsonStr = line.slice(6).trim();
+   156→            if (!jsonStr) continue;
+   157→            try {
+   158→              const event: AgentEvent = JSON.parse(jsonStr);
+   159→              handleEvent(event);
+   160→            } catch {
+   161→              // ignore parse errors on partial chunks
+   162→            }
+   163→          }
+   164→        }
+   165→      }
+   166→    } catch (err: any) {
+   167→      if (err?.name !== "AbortError") {
+   168→        setEvents((prev) => [
+   169→          ...prev,
+   170→          {
+   171→            type: "agent_error",
+   172→            agentId: "supervisor",
+   173→            agentName: "Supervisor",
+   174→            timestamp: Date.now(),
+   175→            error: err?.message ?? "Connection error",
+   176→          },
+   177→        ]);
+   178→      }
+   179→    } finally {
+   180→      setRunning(false);
+   181→      setActiveAgent(null);
+   182→    }
+   183→  }, [claimId, customClaim, running]);
+   184→
+   185→  // Auto-run the pipeline when a custom claim is submitted
+   186→  const autoRanRef = useRef<CustomClaimData | null>(null);
+   187→  useEffect(() => {
+   188→    if (customClaim && autoRanRef.current !== customClaim && !running) {
+   189→      autoRanRef.current = customClaim;
+   190→      const t = setTimeout(() => handleRun(), 400);
+   191→      return () => clearTimeout(t);
+   192→    }
+   193→  }, [customClaim, running, handleRun]);
+   194→
+   195→  const handleEvent = useCallback((event: AgentEvent) => {
+   196→    if (event.type === "agent_start") {
+   197→      setAgentStatuses((prev) => ({ ...prev, [event.agentId]: "running" }));
+   198→      setActiveAgent(event.agentId);
+   199→    } else if (event.type === "agent_complete") {
+   200→      setAgentStatuses((prev) => ({ ...prev, [event.agentId]: "done" }));
+   201→      if (event.state) {
+   202→        setFinalState((prev: any) => ({ ...prev, ...event.state }));
+   203→      }
+   204→    } else if (event.type === "agent_error") {
+   205→      setAgentStatuses((prev) => ({ ...prev, [event.agentId]: "error" }));
+   206→    } else if (event.type === "pipeline_complete") {
+   207→      setFinalState(event.state);
+   208→    }
+   209→    setEvents((prev) => [...prev, event]);
+   210→  }, []);
+   211→
+   212→  // Auto-scroll event log
+   213→  useEffect(() => {
+   214→    if (eventLogRef.current) {
+   215→      eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight;
+   216→    }
+   217→  }, [events]);
+   218→
+   219→  const handleReset = () => {
+   220→    abortRef.current?.abort();
+   221→    setRunning(false);
+   222→    setAgentStatuses({});
+   223→    setEvents([]);
+   224→    setFinalState(null);
+   225→    setActiveAgent(null);
+   226→  };
+   227→
+   228→  if ((!claimId && !customClaim) || !claim) {
+   229→    return (
+   230→      <section id="processor" className="mx-auto max-w-6xl px-4 sm:px-6 py-12">
+   231→        <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+   232→          <CardContent className="p-8 sm:p-12 text-center">
+   233→            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mx-auto mb-4">
+   234→              <Gavel className="w-8 h-8 text-primary" />
+   235→            </div>
+   236→            <h3 className="text-lg font-semibold mb-2">No claim selected yet</h3>
+   237→            <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+   238→              Click a claim card above (look for the <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-bold align-middle">START HERE</span> badge) — or build a <span className="font-semibold text-foreground">custom claim</span> below — then hit <span className="font-semibold text-foreground">Run Pipeline</span> to watch the 9 agents work.
+   239→            </p>
+   240→            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+   241→              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border">
+   242→                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+   243→                Waiting for claim selection
+   244→              </span>
+   245→            </div>
+   246→          </CardContent>
+   247→        </Card>
+   248→      </section>
+   249→    );
+   250→  }
+   251→
+   252→  return (
+   253→    <section id="processor" className="mx-auto max-w-6xl px-4 sm:px-6 py-12 border-t border-border">
+   254→      <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+   255→        <div>
+   256→          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Adjudication Pipeline</h2>
+   257→          <p className="text-muted-foreground mt-1">
+   258→            <span className="font-mono text-sm">{claim.id}</span> · {claim.claimant} · {claim.lob}
+   259→          </p>
+   260→        </div>
+   261→        <div className="flex gap-2">
+   262→          {running ? (
+   263→            <Button variant="outline" size="sm" onClick={handleReset}>
+   264→              <RotateCcw className="w-4 h-4 mr-1" /> Reset
+   265→            </Button>
+   266→          ) : (
+   267→            <Button size="lg" onClick={handleRun} className="agent-pulse text-base px-6">
+   268→              <Play className="w-4 h-4 mr-2 fill-current" /> Run Pipeline
+   269→            </Button>
+   270→          )}
+   271→        </div>
+   272→      </div>
+   273→
+   274→      <div className="grid lg:grid-cols-5 gap-4 lg:gap-6">
+   275→        {/* Left: Agent graph + claim detail */}
+   276→        <div className="lg:col-span-2 space-y-4">
+   277→          <AgentGraph statuses={agentStatuses} activeAgent={activeAgent} />
+   278→          <ClaimDetailCard claim={claim} />
+   279→        </div>
+   280→
+   281→        {/* Right: Event log + results */}
+   282→        <div className="lg:col-span-3 space-y-4">
+   283→          <EventLogCard events={events} logRef={eventLogRef} running={running} />
+   284→          {finalState && <ResultsPanel state={finalState} />}
+   285→        </div>
+   286→      </div>
+   287→    </section>
+   288→  );
+   289→}
+   290→
+   291→// ===== Agent Graph Visualization =====
+   292→function AgentGraph({ statuses, activeAgent }: { statuses: Record<string, AgentStatus>; activeAgent: string | null }) {
+   293→  return (
+   294→    <Card>
+   295→      <CardHeader className="pb-3">
+   296→        <CardTitle className="text-sm flex items-center gap-2">
+   297→          <GitBranch className="w-4 h-4" /> Agent Graph
+   298→        </CardTitle>
+   299→      </CardHeader>
+   300→      <CardContent className="space-y-1.5">
+   301→        {AGENTS.map((agent, idx) => {
+   302→          const status = statuses[agent.id] ?? "idle";
+   303→          const Icon = agent.icon;
+   304→          return (
+   305→            <div key={agent.id}>
+   306→              <div
+   307→                className={`flex items-center gap-3 rounded-lg border p-2.5 transition-all ${
+   308→                  status === "running"
+   309→                    ? "border-primary bg-primary/5 agent-pulse"
+   310→                    : status === "done"
+   311→                    ? "border-primary/30 bg-primary/5"
+   312→                    : status === "error"
+   313→                    ? "border-destructive/40 bg-destructive/5"
+   314→                    : "border-border bg-card"
+   315→                }`}
+   316→              >
+   317→                <div
+   318→                  className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
+   319→                  style={{ backgroundColor: `color-mix(in oklch, ${agent.color} 15%, transparent)`, color: agent.color }}
+   320→                >
+   321→                  {status === "running" ? (
+   322→                    <Loader2 className="w-4 h-4 animate-spin" />
+   323→                  ) : status === "done" ? (
+   324→                    <CheckCircle2 className="w-4 h-4" style={{ color: agent.color }} />
+   325→                  ) : status === "error" ? (
+   326→                    <XCircle className="w-4 h-4 text-destructive" />
+   327→                  ) : (
+   328→                    <Icon className="w-4 h-4 opacity-50" />
+   329→                  )}
+   330→                </div>
+   331→                <div className="flex-1 min-w-0">
+   332→                  <div className="text-sm font-medium leading-tight">{agent.name}</div>
+   333→                  <div className="text-xs text-muted-foreground leading-tight">{agent.desc}</div>
+   334→                </div>
+   335→                {status === "running" && (
+   336→                  <Badge variant="outline" className="text-[10px] font-mono border-primary/40 text-primary animate-pulse">
+   337→                    running
+   338→                  </Badge>
+   339→                )}
+   340→                {status === "done" && (
+   341→                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+   342→                )}
+   343→              </div>
+   344→              {idx < AGENTS.length - 1 && (
+   345→                <div className="flex justify-center py-0.5">
+   346→                  <div className={`w-0.5 h-3 ${statuses[agent.id] === "done" ? "bg-primary/40" : "bg-border"}`} />
+   347→                </div>
+   348→              )}
+   349→            </div>
+   350→          );
+   351→        })}
+   352→      </CardContent>
+   353→    </Card>
+   354→  );
+   355→}
+   356→
+   357→// ===== Claim Detail Card =====
+   358→function ClaimDetailCard({ claim }: { claim: Claim }) {
+   359→  return (
+   360→    <Card>
+   361→      <CardHeader className="pb-3">
+   362→        <CardTitle className="text-sm flex items-center gap-2">
+   363→          <FileText className="w-4 h-4" /> Claim Bundle
+   364→        </CardTitle>
+   365→      </CardHeader>
+   366→      <CardContent className="space-y-3 text-sm">
+   367→        <div className="grid grid-cols-2 gap-2">
+   368→          <Field label="Amount" value={`$${claim.amount.toLocaleString()}`} />
+   369→          <Field label="Date of Loss" value={claim.dateOfLoss} />
+   370→          <Field label="Location" value={claim.location} />
+   371→          <Field label="Policy" value={claim.policyId} mono />
+   372→        </div>
+   373→        <Separator />
+   374→        <div>
+   375→          <div className="text-xs font-medium text-muted-foreground mb-1.5">CLAIMANT NARRATIVE</div>
+   376→          <p className="text-sm leading-relaxed">{claim.narrative}</p>
+   377→        </div>
+   378→        <Separator />
+   379→        <div>
+   380→          <div className="text-xs font-medium text-muted-foreground mb-1.5">DOCUMENTS ({claim.documents.length})</div>
+   381→          <div className="space-y-1.5">
+   382→            {claim.documents.map((doc) => (
+   383→              <div key={doc.id} className="flex items-start gap-2 text-xs">
+   384→                <FileText className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
+   385→                <div>
+   386→                  <div className="font-medium">{doc.title}</div>
+   387→                  <div className="text-muted-foreground line-clamp-2">{doc.content.slice(0, 120)}...</div>
+   388→                </div>
+   389→              </div>
+   390→            ))}
+   391→          </div>
+   392→        </div>
+   393→        <Separator />
+   394→        <div>
+   395→          <div className="text-xs font-medium text-muted-foreground mb-1.5">PHOTO EVIDENCE ({claim.photos.length})</div>
+   396→          <div className="space-y-1.5">
+   397→            {claim.photos.map((photo) => (
+   398→              <div key={photo.id} className="flex items-start gap-2 text-xs">
+   399→                <Eye className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
+   400→                <div className="text-muted-foreground line-clamp-2">{photo.description.slice(0, 140)}...</div>
+   401→              </div>
+   402→            ))}
+   403→          </div>
+   404→        </div>
+   405→      </CardContent>
+   406→    </Card>
+   407→  );
+   408→}
+   409→
+   410→function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+   411→  return (
+   412→    <div>
+   413→      <div className="text-xs text-muted-foreground">{label}</div>
+   414→      <div className={`text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</div>
+   415→    </div>
+   416→  );
+   417→}
+   418→
+   419→// ===== Event Log =====
+   420→function EventLogCard({ events, logRef, running }: { events: AgentEvent[]; logRef: React.RefObject<HTMLDivElement | null>; running: boolean }) {
+   421→  return (
+   422→    <Card>
+   423→      <CardHeader className="pb-3">
+   424→        <CardTitle className="text-sm flex items-center gap-2">
+   425→          <Activity className="w-4 h-4" /> Pipeline Trace
+   426→          {running && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary ml-auto" />}
+   427→        </CardTitle>
+   428→      </CardHeader>
+   429→      <CardContent>
+   430→        {events.length === 0 ? (
+   431→          <div className="text-center py-8 text-sm text-muted-foreground">
+   432→            Click <span className="font-medium text-foreground">Run Pipeline</span> to stream live agent execution.
+   433→          </div>
+   434→        ) : (
+   435→          <div
+   436→            ref={logRef}
+   437→            className="max-h-72 overflow-y-auto scrollbar-thin space-y-1.5 pr-1 font-mono text-xs"
+   438→          >
+   439→            {events.map((event, i) => (
+   440→              <EventLine key={i} event={event} />
+   441→            ))}
+   442→          </div>
+   443→        )}
+   444→      </CardContent>
+   445→    </Card>
+   446→  );
+   447→}
+   448→
+   449→function EventLine({ event }: { event: AgentEvent }) {
+   450→  const time = new Date(event.timestamp).toLocaleTimeString("en-US", { hour12: false }) +
+   451→    "." + String(event.timestamp % 1000).padStart(3, "0");
+   452→
+   453→  if (event.type === "agent_error") {
+   454→    return (
+   455→      <div className="flex gap-2 text-destructive fade-in-up">
+   456→        <span className="text-muted-foreground">{time}</span>
+   457→        <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+   458→        <span><span className="font-semibold">{event.agentName}</span>: {event.error}</span>
+   459→      </div>
+   460→    );
+   461→  }
+   462→
+   463→  const isStart = event.type === "agent_start";
+   464→  return (
+   465→    <div className={`flex gap-2 fade-in-up ${isStart ? "text-muted-foreground" : ""}`}>
+   466→      <span className="text-muted-foreground">{time}</span>
+   467→      {isStart ? (
+   468→        <Play className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+   469→      ) : (
+   470→        <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+   471→      )}
+   472→      <span>
+   473→        <span className="font-semibold">{event.agentName}</span>
+   474→        {isStart ? " started" : " complete"}
+   475→        {!isStart && event.durationMs != null && (
+   476→          <span className="text-muted-foreground"> · {event.durationMs}ms</span>
+   477→        )}
+   478→        {!isStart && event.result && (
+   479→          <span className="text-muted-foreground"> — {event.result}</span>
+   480→        )}
+   481→      </span>
+   482→    </div>
+   483→  );
+   484→}
+   485→
+   486→// ===== Results Panel =====
+   487→function ResultsPanel({ state }: { state: any }) {
+   488→  const adjudication = state.adjudication;
+   489→  const audit = state.audit;
+   490→
+   491→  if (!adjudication) return null;
+   492→
+   493→  const decisionColor =
+   494→    adjudication.decision === "approve" ? "text-chart-2" :
+   495→    adjudication.decision === "deny" ? "text-destructive" :
+   496→    "text-chart-3";
+   497→
+   498→  const decisionBg =
+   499→    adjudication.decision === "approve" ? "bg-chart-2/10 border-chart-2/20" :
+   500→    adjudication.decision === "deny" ? "bg-destructive/10 border-destructive/20" :
+   501→    "bg-chart-3/10 border-chart-3/20";
+   502→
+   503→  return (
+   504→    <div className="space-y-4">
+   505→      {/* Decision card */}
+   506→      <Card className={`border-2 ${decisionBg}`}>
+   507→        <CardContent className="p-5">
+   508→          <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+   509→            <div>
+   510→              <div className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wide">Final Decision</div>
+   511→              <div className={`text-3xl font-bold ${decisionColor} capitalize`}>{adjudication.decision}</div>
+   512→            </div>
+   513→            <div className="text-right">
+   514→              <div className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wide">Recommended Payout</div>
+   515→              <div className="text-3xl font-bold flex items-center gap-1">
+   516→                <CircleDollarSign className="w-6 h-6" />
+   517→                {Number(adjudication.recommendedPayout ?? 0).toLocaleString()}
+   518→              </div>
+   519→            </div>
+   520→          </div>
+   521→          <Separator className="my-3" />
+   522→          <p className="text-sm leading-relaxed">{adjudication.summary}</p>
+   523→        </CardContent>
+   524→      </Card>
+   525→
+   526→      {/* Agent findings grid */}
+   527→      <div className="grid sm:grid-cols-2 gap-4">
+   528→        {state.routing && (
+   529→          <FindingCard title="Routing" icon={<GitBranch className="w-4 h-4" />}>
+   530→            <div className="flex gap-2 flex-wrap mb-2">
+   531→              <Badge variant="outline" className="text-xs capitalize">{state.routing.path.replace("_", " ")}</Badge>
+   532→              <Badge variant="outline" className="text-xs capitalize">{state.routing.severity}</Badge>
+   533→            </div>
+   534→            <p className="text-xs text-muted-foreground">{state.routing.rationale}</p>
+   535→          </FindingCard>
+   536→        )}
+   537→
+   538→        {state.damageAssessment && (
+   539→          <FindingCard title="Damage Assessment" icon={<Eye className="w-4 h-4" />}>
+   540→            <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+   541→              <div>
+   542→                <div className="text-muted-foreground">Severity</div>
+   543→                <div className="font-medium capitalize">{state.damageAssessment.severity}</div>
+   544→              </div>
+   545→              <div>
+   546→                <div className="text-muted-foreground">Damage area</div>
+   547→                <div className="font-medium">{state.damageAssessment.estimatedDamageAreaPct}%</div>
+   548→              </div>
+   549→            </div>
+   550→            <div className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${
+   551→              state.damageAssessment.consistencyWithNarrative ? "text-chart-2" : "text-destructive"
+   552→            }`}>
+   553→              {state.damageAssessment.consistencyWithNarrative ? (
+   554→                <><CheckCircle2 className="w-3.5 h-3.5" /> Consistent with narrative</>
+   555→              ) : (
+   556→                <><AlertTriangle className="w-3.5 h-3.5" /> INCONSISTENCY detected</>
+   557→              )}
+   558→            </div>
+   559→            <p className="text-xs text-muted-foreground line-clamp-3">{state.damageAssessment.notes}</p>
+   560→          </FindingCard>
+   561→        )}
+   562→
+   563→        {state.fraudAssessment && (
+   564→          <FindingCard title="Fraud Assessment" icon={<ShieldAlert className="w-4 h-4" />}>
+   565→            <div className="flex items-center gap-3 mb-2">
+   566→              <div className="text-2xl font-bold">
+   567→                {state.fraudAssessment.score}
+   568→                <span className="text-sm text-muted-foreground">/100</span>
+   569→              </div>
+   570→              <Badge
+   571→                variant="outline"
+   572→                className={`text-xs capitalize ${
+   573→                  state.fraudAssessment.recommendation === "clear" ? "text-chart-2" :
+   574→                  state.fraudAssessment.recommendation === "refer_to_siu" ? "text-destructive" :
+   575→                  "text-chart-3"
+   576→                }`}
+   577→              >
+   578→                {state.fraudAssessment.recommendation.replace(/_/g, " ")}
+   579→              </Badge>
+   580→            </div>
+   581→            {state.fraudAssessment.signals?.length > 0 && (
+   582→              <ul className="text-xs text-muted-foreground space-y-0.5">
+   583→                {state.fraudAssessment.signals.slice(0, 3).map((s: string, i: number) => (
+   584→                  <li key={i} className="flex gap-1.5">
+   585→                    <span className="text-muted-foreground/60">•</span> {s}
+   586→                  </li>
+   587→                ))}
+   588→              </ul>
+   589→            )}
+   590→          </FindingCard>
+   591→        )}
+   592→
+   593→        {state.coverageAnalysis && (
+   594→          <FindingCard title="Coverage Verification" icon={<ClipboardCheck className="w-4 h-4" />}>
+   595→            <div className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
+   596→              state.coverageAnalysis.covered ? "text-chart-2" : "text-destructive"
+   597→            }`}>
+   598→              {state.coverageAnalysis.covered ? (
+   599→                <><CheckCircle2 className="w-3.5 h-3.5" /> Covered under policy</>
+   600→              ) : (
+   601→                <><XCircle className="w-3.5 h-3.5" /> Not covered</>
+   602→              )}
+   603→            </div>
+   604→            <div className="text-xs space-y-1">
+   605→              <div><span className="text-muted-foreground">Deductible:</span> <span className="font-medium">{state.coverageAnalysis.deductible}</span></div>
+   606→              {state.coverageAnalysis.exclusions?.length > 0 && (
+   607→                <div><span className="text-muted-foreground">Exclusions:</span> <span className="font-medium text-destructive">{state.coverageAnalysis.exclusions.join(", ")}</span></div>
+   608→              )}
+   609→            </div>
+   610→          </FindingCard>
+   611→        )}
+   612→      </div>
+   613→
+   614→      {/* Retrieved clauses (RAG) */}
+   615→      {state.policyRetrieval?.clauses?.length > 0 && (
+   616→        <Card>
+   617→          <CardHeader className="pb-3">
+   618→            <CardTitle className="text-sm flex items-center gap-2">
+   619→              <Search className="w-4 h-4" /> Retrieved Policy Clauses (RAG)
+   620→            </CardTitle>
+   621→          </CardHeader>
+   622→          <CardContent className="space-y-2">
+   623→            {state.policyRetrieval.clauses.map((clause: any) => (
+   624→              <div key={clause.id} className="rounded-lg border border-border p-3 bg-muted/30">
+   625→                <div className="flex items-center justify-between gap-2 mb-1">
+   626→                  <div className="flex items-center gap-2">
+   627→                    <Badge variant="secondary" className="font-mono text-[10px]">{clause.id}</Badge>
+   628→                    <span className="text-sm font-medium">{clause.title}</span>
+   629→                  </div>
+   630→                  <span className="text-xs text-muted-foreground font-mono">score {clause.score}</span>
+   631→                </div>
+   632→                <div className="text-xs text-muted-foreground mb-1">{clause.section}</div>
+   633→                <p className="text-xs leading-relaxed">{clause.snippet}</p>
+   634→              </div>
+   635→            ))}
+   636→          </CardContent>
+   637→        </Card>
+   638→      )}
+   639→
+   640→      {/* Adjudication rationale + citations */}
+   641→      {adjudication.rationale && (
+   642→        <Card>
+   643→          <CardHeader className="pb-3">
+   644→            <CardTitle className="text-sm flex items-center gap-2">
+   645→              <Gavel className="w-4 h-4" /> Adjudication Rationale
+   646→            </CardTitle>
+   647→          </CardHeader>
+   648→          <CardContent>
+   649→            <p className="text-sm leading-relaxed whitespace-pre-wrap">{adjudication.rationale}</p>
+   650→            {adjudication.citations?.length > 0 && (
+   651→              <div className="mt-4 pt-4 border-t border-border">
+   652→                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+   653→                  <Quote className="w-3.5 h-3.5" /> CITATIONS ({adjudication.citations.length})
+   654→                </div>
+   655→                <div className="space-y-2">
+   656→                  {adjudication.citations.map((c: any, i: number) => (
+   657→                    <div key={i} className="rounded-lg border-l-2 border-primary/40 pl-3 py-1.5">
+   658→                      <p className="text-xs mb-1">{c.claim}</p>
+   659→                      <div className="flex items-center gap-2">
+   660→                        <Badge variant="secondary" className="font-mono text-[10px]">{c.clauseId}</Badge>
+   661→                        <span className="text-xs text-muted-foreground">{c.clauseTitle}</span>
+   662→                      </div>
+   663→                    </div>
+   664→                  ))}
+   665→                </div>
+   666→              </div>
+   667→            )}
+   668→          </CardContent>
+   669→        </Card>
+   670→      )}
+   671→
+   672→      {/* Audit gate */}
+   673→      {audit && (
+   674→        <Card>
+   675→          <CardHeader className="pb-3">
+   676→            <CardTitle className="text-sm flex items-center gap-2">
+   677→              <ClipboardCheck className="w-4 h-4" /> Auditor QA Gate
+   678→              <Badge
+   679→                variant="outline"
+   680→                className={`text-xs ml-auto capitalize ${
+   681→                  audit.verdict === "pass" ? "text-chart-2 border-chart-2/30" :
+   682→                  audit.verdict === "escalate" ? "text-destructive border-destructive/30" :
+   683→                  "text-chart-3 border-chart-3/30"
+   684→                }`}
+   685→              >
+   686→                {audit.verdict}
+   687→              </Badge>
+   688→            </CardTitle>
+   689→          </CardHeader>
+   690→          <CardContent>
+   691→            <div className="grid grid-cols-3 gap-3 mb-3">
+   692→              <ScoreBar label="Groundedness" value={audit.groundednessScore} />
+   693→              <ScoreBar label="Coverage Logic" value={audit.coverageLogicScore} />
+   694→              <ScoreBar label="Compliance" value={audit.complianceScore} />
+   695→            </div>
+   696→            {audit.issues?.length > 0 && (
+   697→              <div className="text-xs">
+   698→                <div className="text-muted-foreground font-medium mb-1">ISSUES</div>
+   699→                <ul className="space-y-0.5">
+   700→                  {audit.issues.map((issue: string, i: number) => (
+   701→                    <li key={i} className="flex gap-1.5">
+   702→                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 text-chart-3 shrink-0" />
+   703→                      {issue}
+   704→                    </li>
+   705→                  ))}
+   706→                </ul>
+   707→              </div>
+   708→            )}
+   709→          </CardContent>
+   710→        </Card>
+   711→      )}
+   712→    </div>
+   713→  );
+   714→}
+   715→
+   716→function FindingCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+   717→  return (
+   718→    <Card>
+   719→      <CardHeader className="pb-2">
+   720→        <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+   721→          {icon} {title}
+   722→        </CardTitle>
+   723→      </CardHeader>
+   724→      <CardContent className="pt-0">{children}</CardContent>
+   725→    </Card>
+   726→  );
+   727→}
+   728→
+   729→function ScoreBar({ label, value }: { label: string; value: number }) {
+   730→  const v = Math.max(0, Math.min(100, value));
+   731→  const color = v >= 80 ? "bg-chart-2" : v >= 60 ? "bg-chart-3" : "bg-destructive";
+   732→  return (
+   733→    <div>
+   734→      <div className="flex justify-between text-xs mb-1">
+   735→        <span className="text-muted-foreground">{label}</span>
+   736→        <span className="font-mono font-medium">{v}</span>
+   737→      </div>
+   738→      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+   739→        <div className={`h-full ${color} transition-all`} style={{ width: `${v}%` }} />
+   740→      </div>
+   741→    </div>
+   742→  );
+   743→}
+   744→

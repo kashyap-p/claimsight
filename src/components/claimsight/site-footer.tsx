@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, Github, ExternalLink } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 export function SiteFooter() {
   return (

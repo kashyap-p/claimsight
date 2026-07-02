@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { getClaimById } from "@/lib/claims";
+import { getClaimById, claims } from "@/lib/claims";
 
-export const dynamic = "force-dynamic";
+// Statically generate all known claim detail pages
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return claims.map((c) => ({ id: c.id }));
+}
 
 export async function GET(
   _req: Request,
