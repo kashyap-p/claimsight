@@ -14,24 +14,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "ClaimSight — Multi-Modal Multi-Agent Claims Adjudication Copilot",
+  description:
+    "A production-grade AI system that ingests messy insurance claims and runs them through a 12-agent LangGraph workflow: triage, document extraction, vision-based damage assessment, RAG over policy corpora, fraud scoring, and cited settlement recommendations.",
+  keywords: ["AI engineering", "LangGraph", "RAG", "multi-agent", "LLMOps", "claims", "insurance", "HuggingFace", "pgvector"],
+  authors: [{ name: "ClaimSight" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "ClaimSight — Multi-Agent Claims Adjudication Copilot",
+    description: "12-agent LangGraph workflow with RAG, multimodal vision, fraud detection, eval harness & LLMOps.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "ClaimSight",
+    description: "Multi-modal multi-agent claims adjudication copilot",
   },
 };
 
